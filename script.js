@@ -1,34 +1,48 @@
 "use strict";
 
+/* =========================================================
+   HOTPOINT TOOLS TRACKER
+   ========================================================= */
+
 const STORAGE_KEY = "hotpointToolsTrackerV1";
+
 const ADMIN_USER = "ADMIN";
 const ADMIN_PASSWORD = "Hotpoint_tools";
+
+/* =========================================================
+   DEFAULT TOOLS
+   ========================================================= */
 
 const seedTools = [
     {
         name: "Ladders",
         quantity: 2,
-        description: "Access ladders for installation and service work."
+        description:
+            "Access ladders for installation and service work."
     },
     {
         name: "Flaring Kit",
         quantity: 2,
-        description: "Copper pipe flaring tools and accessories."
+        description:
+            "Copper pipe flaring tools and accessories."
     },
     {
         name: "Oxy/Acetylene Gauge",
         quantity: 1,
-        description: "Gauge set for controlled oxy-acetylene work."
+        description:
+            "Gauge set for controlled oxy-acetylene work."
     },
     {
         name: "Grinder",
         quantity: 2,
-        description: "Portable angle grinder for workshop and site tasks."
+        description:
+            "Portable angle grinder for workshop and site tasks."
     },
     {
         name: "Scaffolding",
         quantity: 1,
-        description: "Mobile scaffolding set for elevated work."
+        description:
+            "Mobile scaffolding set for elevated work."
     }
 ];
 
@@ -37,9 +51,10 @@ const seedTools = [
    ========================================================= */
 
 function uid() {
-    return `${Date.now().toString(36)}${Math.random()
-        .toString(36)
-        .slice(2, 8)}`;
+    return (
+        Date.now().toString(36) +
+        Math.random().toString(36).slice(2, 8)
+    );
 }
 
 function today() {
@@ -51,27 +66,35 @@ function prettyDate(value) {
         return "—";
     }
 
-    return new Date(`${value}T00:00:00`).toLocaleDateString(
-        "en-GB",
-        {
-            day: "2-digit",
-            month: "short",
-            year: "numeric"
+    const date = new Date(`${value}T00:00:00`);
+
+    return date.toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric"
+    });
+}
+
+function escapeHTML(value) {
+    return String(value).replace(
+        /[&<>'"]/g,
+        character => {
+            const characters = {
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                "'": "&#39;",
+                '"': "&quot;"
+            };
+
+            return characters[character];
         }
     );
 }
 
-function escapeHTML(value) {
-    return String(value).replace(/[&<>'"]/g, character => {
-        return {
-            "&": "&amp;",
-            "<": "&lt;",
-            ">": "&gt;",
-            "'": "&#39;",
-            '"': "&quot;"
-        }[character];
-    });
-}
+/* =========================================================
+   LOCAL STORAGE
+   ========================================================= */
 
 function loadData() {
     try {
@@ -87,7 +110,10 @@ function loadData() {
             return savedData;
         }
     } catch (error) {
-        console.error("Unable to load saved data:", error);
+        console.error(
+            "Unable to load saved tool records:",
+            error
+        );
     }
 
     const initialData = {
@@ -96,6 +122,7 @@ function loadData() {
             id: uid(),
             assignments: []
         })),
+
         history: []
     };
 
@@ -149,30 +176,44 @@ function initRequest() {
             .toLowerCase();
 
         const displayedTools = data.tools.filter(tool => {
+            const technicianNames = tool.assignments
+                .map(assignment => assignment.technician)
+                .join(" ");
+
             const searchableText = `
                 ${tool.name}
                 ${tool.description}
-                ${tool.assignments
-                    .map(item => item.technician)
-                    .join(" ")}
+                ${technicianNames}
             `.toLowerCase();
 
             return searchableText.includes(searchText);
         });
 
+        renderSummary(data);
+        renderTools(displayedTools);
+        renderTechnicianFilter(data);
+        renderHistory(data);
+    }
+
+    function renderSummary(data) {
         const totalUnits = data.tools.reduce(
-            (total, tool) => total + tool.quantity,
+            (total, tool) => {
+                return total + tool.quantity;
+            },
             0
         );
 
         const totalAvailable = data.tools.reduce(
-            (total, tool) => total + available(tool),
+            (total, tool) => {
+                return total + available(tool);
+            },
             0
         );
 
         const totalAllocated = data.tools.reduce(
-            (total, tool) =>
-                total + tool.assignments.length,
+            (total, tool) => {
+                return total + tool.assignments.length;
+            },
             0
         );
 
@@ -187,31 +228,49 @@ function initRequest() {
         document.querySelector(
             "#allocatedUnits"
         ).textContent = totalAllocated;
+    }
 
-        document.querySelector("#toolGrid").innerHTML =
-            displayedTools.map(tool => {
+    function renderTools(tools) {
+        const toolGrid =
+            document.querySelector("#toolGrid");
+
+        toolGrid.innerHTML = tools
+            .map(tool => {
                 const freeUnits = available(tool);
+
+                const status =
+                    freeUnits > 0
+                        ? statusChip(
+                            "AVAILABLE",
+                            "free"
+                        )
+                        : statusChip(
+                            "FULLY ALLOCATED",
+                            "busy"
+                        );
 
                 const allocationList =
                     tool.assignments.length > 0
                         ? `
                             <div class="assignments">
                                 ${tool.assignments
-                                    .map(assignment => `
-                                        <div class="assignment-line">
-                                            <strong>
-                                                ${escapeHTML(
-                                                    assignment.technician
-                                                )}
-                                            </strong>
+                                    .map(assignment => {
+                                        return `
+                                            <div class="assignment-line">
+                                                <strong>
+                                                    ${escapeHTML(
+                                                        assignment.technician
+                                                    )}
+                                                </strong>
 
-                                            <span>
-                                                ${prettyDate(
-                                                    assignment.assignedDate
-                                                )}
-                                            </span>
-                                        </div>
-                                    `)
+                                                <span>
+                                                    ${prettyDate(
+                                                        assignment.assignedDate
+                                                    )}
+                                                </span>
+                                            </div>
+                                        `;
+                                    })
                                     .join("")}
                             </div>
                         `
@@ -224,17 +283,7 @@ function initRequest() {
                                 ${escapeHTML(tool.name)}
                             </h2>
 
-                            ${
-                                freeUnits > 0
-                                    ? statusChip(
-                                        "AVAILABLE",
-                                        "free"
-                                    )
-                                    : statusChip(
-                                        "FULLY ALLOCATED",
-                                        "busy"
-                                    )
-                            }
+                            ${status}
                         </div>
 
                         <p class="description">
@@ -244,12 +293,16 @@ function initRequest() {
                         <div class="availability">
                             <div>
                                 <span>Total</span>
-                                <strong>${tool.quantity}</strong>
+                                <strong>
+                                    ${tool.quantity}
+                                </strong>
                             </div>
 
                             <div>
                                 <span>Free</span>
-                                <strong>${freeUnits}</strong>
+                                <strong>
+                                    ${freeUnits}
+                                </strong>
                             </div>
 
                             <div>
@@ -263,22 +316,20 @@ function initRequest() {
                         ${allocationList}
                     </article>
                 `;
-            }).join("");
+            })
+            .join("");
 
         document.querySelector(
             "#emptyTools"
-        ).hidden = displayedTools.length !== 0;
-
-        renderTechnicianFilter(data);
-        renderHistory(data);
+        ).hidden = tools.length !== 0;
     }
 
     function renderTechnicianFilter(data) {
         const technicianNames = [
             ...new Set(
-                data.history.map(
-                    record => record.technician
-                )
+                data.history.map(record => {
+                    return record.technician;
+                })
             )
         ].sort();
 
@@ -286,21 +337,25 @@ function initRequest() {
             historyFilter.value;
 
         historyFilter.innerHTML = `
-            <option value="">All technicians</option>
+            <option value="">
+                All technicians
+            </option>
 
             ${technicianNames
-                .map(name => `
-                    <option
-                        value="${escapeHTML(name)}"
-                        ${
-                            name === selectedTechnician
-                                ? "selected"
-                                : ""
-                        }
-                    >
-                        ${escapeHTML(name)}
-                    </option>
-                `)
+                .map(name => {
+                    return `
+                        <option
+                            value="${escapeHTML(name)}"
+                            ${
+                                name === selectedTechnician
+                                    ? "selected"
+                                    : ""
+                            }
+                        >
+                            ${escapeHTML(name)}
+                        </option>
+                    `;
+                })
                 .join("")}
         `;
     }
@@ -317,48 +372,45 @@ function initRequest() {
                         selectedTechnician
                 );
             })
-            .sort((first, second) => {
-                return second.assignedDate.localeCompare(
-                    first.assignedDate
+            .sort((firstRecord, secondRecord) => {
+                return secondRecord.assignedDate.localeCompare(
+                    firstRecord.assignedDate
                 );
             });
 
-        document.querySelector(
-            "#historyBody"
-        ).innerHTML = allocationHistory
-            .map(record => `
-                <tr>
-                    <td>
-                        ${escapeHTML(record.technician)}
-                    </td>
+        const historyBody =
+            document.querySelector("#historyBody");
 
-                    <td>
-                        ${escapeHTML(record.toolName)}
-                    </td>
+        historyBody.innerHTML = allocationHistory
+            .map(record => {
+                const status = record.releasedDate
+                    ? statusChip("Released", "free")
+                    : statusChip("Allocated", "busy");
 
-                    <td>
-                        ${prettyDate(record.assignedDate)}
-                    </td>
+                return `
+                    <tr>
+                        <td>
+                            ${escapeHTML(record.technician)}
+                        </td>
 
-                    <td>
-                        ${prettyDate(record.releasedDate)}
-                    </td>
+                        <td>
+                            ${escapeHTML(record.toolName)}
+                        </td>
 
-                    <td>
-                        ${
-                            record.releasedDate
-                                ? statusChip(
-                                    "Released",
-                                    "free"
-                                )
-                                : statusChip(
-                                    "Allocated",
-                                    "busy"
-                                )
-                        }
-                    </td>
-                </tr>
-            `)
+                        <td>
+                            ${prettyDate(record.assignedDate)}
+                        </td>
+
+                        <td>
+                            ${prettyDate(record.releasedDate)}
+                        </td>
+
+                        <td>
+                            ${status}
+                        </td>
+                    </tr>
+                `;
+            })
             .join("");
 
         document.querySelector(
@@ -420,15 +472,20 @@ function initAdmin() {
 
     /* ADMIN LOGIN */
 
-    document.querySelector("#loginForm")
+    document
+        .querySelector("#loginForm")
         .addEventListener("submit", event => {
             event.preventDefault();
 
             const username =
-                document.querySelector("#username").value;
+                document.querySelector(
+                    "#username"
+                ).value;
 
             const password =
-                document.querySelector("#password").value;
+                document.querySelector(
+                    "#password"
+                ).value;
 
             const loginIsCorrect =
                 username === ADMIN_USER &&
@@ -457,7 +514,8 @@ function initAdmin() {
 
     /* ADMIN LOGOUT */
 
-    document.querySelector("#logoutBtn")
+    document
+        .querySelector("#logoutBtn")
         .addEventListener("click", () => {
             sessionStorage.removeItem(
                 "hotpointAdmin"
@@ -473,7 +531,8 @@ function initAdmin() {
 
     /* ADD NEW TOOL */
 
-    document.querySelector("#toolForm")
+    document
+        .querySelector("#toolForm")
         .addEventListener("submit", event => {
             event.preventDefault();
 
@@ -484,22 +543,41 @@ function initAdmin() {
                     "#toolName"
                 ).value.trim();
 
-            const toolQuantity = Number(
+            const quantity = Number(
                 document.querySelector(
                     "#toolQuantity"
                 ).value
             );
 
-            const toolDescription =
+            const description =
                 document.querySelector(
                     "#toolDescription"
                 ).value.trim();
 
+            if (!toolName || !description) {
+                alert(
+                    "Enter the tool name and description."
+                );
+
+                return;
+            }
+
+            if (
+                !Number.isInteger(quantity) ||
+                quantity < 1
+            ) {
+                alert(
+                    "The quantity must be a whole number of at least 1."
+                );
+
+                return;
+            }
+
             data.tools.push({
                 id: uid(),
                 name: toolName,
-                quantity: toolQuantity,
-                description: toolDescription,
+                quantity: quantity,
+                description: description,
                 assignments: []
             });
 
@@ -516,7 +594,8 @@ function initAdmin() {
 
     /* ASSIGN TOOL */
 
-    document.querySelector("#assignmentForm")
+    document
+        .querySelector("#assignmentForm")
         .addEventListener("submit", event => {
             event.preventDefault();
 
@@ -535,13 +614,29 @@ function initAdmin() {
             const assignedDate =
                 assignedDateInput.value;
 
-            const tool = data.tools.find(
-                item => item.id === selectedToolId
-            );
+            const tool = data.tools.find(item => {
+                return item.id === selectedToolId;
+            });
 
             if (!tool || available(tool) < 1) {
                 alert(
                     "The selected tool is not available."
+                );
+
+                return;
+            }
+
+            if (!technicianName) {
+                alert(
+                    "Enter the technician's name."
+                );
+
+                return;
+            }
+
+            if (!assignedDate) {
+                alert(
+                    "Select the date assigned."
                 );
 
                 return;
@@ -556,7 +651,9 @@ function initAdmin() {
                 releasedDate: ""
             };
 
-            tool.assignments.push(allocationRecord);
+            tool.assignments.push(
+                allocationRecord
+            );
 
             data.history.push({
                 ...allocationRecord
@@ -571,9 +668,10 @@ function initAdmin() {
             renderAdmin();
         });
 
-    /* INVENTORY ACTIONS */
+    /* INVENTORY BUTTON ACTIONS */
 
-    document.querySelector("#adminInventory")
+    document
+        .querySelector("#adminInventory")
         .addEventListener("click", event => {
             const button = event.target.closest(
                 "button[data-action]"
@@ -585,9 +683,9 @@ function initAdmin() {
 
             const data = loadData();
 
-            const tool = data.tools.find(
-                item => item.id === button.dataset.tool
-            );
+            const tool = data.tools.find(item => {
+                return item.id === button.dataset.tool;
+            });
 
             if (!tool) {
                 return;
@@ -614,12 +712,12 @@ function initAdmin() {
                     return;
                 }
 
-                data.tools = data.tools.filter(
-                    item => item.id !== tool.id
-                );
+                data.tools = data.tools.filter(item => {
+                    return item.id !== tool.id;
+                });
             }
 
-            /* SAVE QUANTITY */
+            /* UPDATE TOOL QUANTITY */
 
             if (action === "save") {
                 const quantityInput =
@@ -627,8 +725,23 @@ function initAdmin() {
                         `[data-quantity="${tool.id}"]`
                     );
 
-                const newQuantity =
-                    Number(quantityInput.value);
+                const newQuantity = Number(
+                    quantityInput.value
+                );
+
+                if (
+                    !Number.isInteger(newQuantity) ||
+                    newQuantity < 1
+                ) {
+                    alert(
+                        "The quantity must be a whole number of at least 1."
+                    );
+
+                    quantityInput.value =
+                        tool.quantity;
+
+                    return;
+                }
 
                 if (
                     newQuantity <
@@ -638,13 +751,8 @@ function initAdmin() {
                         `Quantity cannot be below ${tool.assignments.length} currently allocated unit(s).`
                     );
 
-                    return;
-                }
-
-                if (newQuantity < 1) {
-                    alert(
-                        "Tool quantity must be at least 1."
-                    );
+                    quantityInput.value =
+                        tool.quantity;
 
                     return;
                 }
@@ -667,6 +775,14 @@ function initAdmin() {
                     return;
                 }
 
+                const shouldRelease = confirm(
+                    `Release ${tool.name} from ${assignment.technician}?`
+                );
+
+                if (!shouldRelease) {
+                    return;
+                }
+
                 tool.assignments =
                     tool.assignments.filter(item => {
                         return (
@@ -677,12 +793,14 @@ function initAdmin() {
                 const historyRecord =
                     data.history.find(record => {
                         return (
-                            record.id === assignment.id
+                            record.id ===
+                            assignment.id
                         );
                     });
 
                 if (historyRecord) {
-                    historyRecord.releasedDate = today();
+                    historyRecord.releasedDate =
+                        today();
                 }
             }
 
@@ -710,18 +828,20 @@ function renderAdmin() {
         return;
     }
 
-    const freeTools = data.tools.filter(
-        tool => available(tool) > 0
-    );
+    const freeTools = data.tools.filter(tool => {
+        return available(tool) > 0;
+    });
 
     if (freeTools.length > 0) {
         toolSelect.innerHTML = freeTools
-            .map(tool => `
-                <option value="${tool.id}">
-                    ${escapeHTML(tool.name)}
-                    (${available(tool)} free)
-                </option>
-            `)
+            .map(tool => {
+                return `
+                    <option value="${tool.id}">
+                        ${escapeHTML(tool.name)}
+                        (${available(tool)} free)
+                    </option>
+                `;
+            })
             .join("");
     } else {
         toolSelect.innerHTML = `
@@ -741,8 +861,8 @@ function renderAdmin() {
     if (data.tools.length === 0) {
         inventoryContainer.innerHTML = `
             <div class="empty">
-                No tools in inventory.
-                Add the first tool above.
+                No tools are currently in the inventory.
+                Use the form above to add the first tool.
             </div>
         `;
 
@@ -756,34 +876,36 @@ function renderAdmin() {
                     ? `
                         <div class="current-list">
                             ${tool.assignments
-                                .map(assignment => `
-                                    <div class="current-item">
-                                        <div>
-                                            <strong>
-                                                ${escapeHTML(
-                                                    assignment.technician
-                                                )}
-                                            </strong>
+                                .map(assignment => {
+                                    return `
+                                        <div class="current-item">
+                                            <div>
+                                                <strong>
+                                                    ${escapeHTML(
+                                                        assignment.technician
+                                                    )}
+                                                </strong>
 
-                                            <br>
+                                                <br>
 
-                                            <small>
-                                                Assigned
-                                                ${prettyDate(
-                                                    assignment.assignedDate
-                                                )}
-                                            </small>
+                                                <small>
+                                                    Assigned
+                                                    ${prettyDate(
+                                                        assignment.assignedDate
+                                                    )}
+                                                </small>
+                                            </div>
+
+                                            <button
+                                                data-action="release"
+                                                data-tool="${tool.id}"
+                                                data-assignment="${assignment.id}"
+                                            >
+                                                Release Tool
+                                            </button>
                                         </div>
-
-                                        <button
-                                            data-action="release"
-                                            data-tool="${tool.id}"
-                                            data-assignment="${assignment.id}"
-                                        >
-                                            Release Tool
-                                        </button>
-                                    </div>
-                                `)
+                                    `;
+                                })
                                 .join("")}
                         </div>
                     `
@@ -816,6 +938,7 @@ function renderAdmin() {
                                 data-quantity="${tool.id}"
                                 type="number"
                                 min="${tool.assignments.length || 1}"
+                                step="1"
                                 value="${tool.quantity}"
                             >
                         </label>
@@ -846,7 +969,7 @@ function renderAdmin() {
 }
 
 /* =========================================================
-   START CORRECT PAGE
+   START THE CORRECT PAGE
    ========================================================= */
 
 if (document.body.dataset.page === "request") {
