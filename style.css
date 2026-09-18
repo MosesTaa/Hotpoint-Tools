@@ -436,6 +436,13 @@ td {
     color: var(--muted);
 }
 
+.managed-tool-description {
+    align-self: center;
+    margin: 0;
+    color: var(--muted);
+    overflow-wrap: anywhere;
+}
+
 .managed-tool-fields {
     display: grid;
     grid-template-columns: 110px 1fr;
@@ -453,6 +460,7 @@ td {
 .managed-tool-actions,
 .actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 7px;
 }
 
