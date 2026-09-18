@@ -464,6 +464,18 @@ function renderToolOptions(allocations) {
                 </option>
             `;
         }).join("");
+
+    updateAssignDescription();
+}
+
+function updateAssignDescription() {
+    const selectedTool = tools.find(tool => {
+        return String(tool.id) ===
+            String($("#toolSelect").value);
+    });
+
+    $("#assignDescription").value =
+        selectedTool?.description || "";
 }
 
 /* =========================================================
@@ -484,7 +496,7 @@ function renderActiveAllocations(
 
             return `
                 <div class="allocation">
-                    <span>
+                    <span class="managed-tool-heading">
                         <b>
                             ${escapeHTML(
                                 tool?.name ||
@@ -560,20 +572,37 @@ function renderToolManagement(
                         </small>
                     </span>
 
-                    <button
-                        class="remove"
-                        data-remove-tool="${tool.id}"
-                        data-tool-name="${escapeHTML(
-                            tool.name
-                        )}"
-                        ${
-                            disabled
-                                ? `disabled title="Release allocated units first"`
-                                : ""
-                        }
-                    >
-                        Remove
-                    </button>
+                    <p class="managed-tool-description">
+                        ${escapeHTML(
+                            tool.description ||
+                            "No description added."
+                        )}
+                    </p>
+
+                    <div class="managed-tool-actions">
+                        <button
+                            type="button"
+                            data-edit-description="${tool.id}"
+                        >
+                            Edit Description
+                        </button>
+
+                        <button
+                            type="button"
+                            class="remove"
+                            data-remove-tool="${tool.id}"
+                            data-tool-name="${escapeHTML(
+                                tool.name
+                            )}"
+                            ${
+                                disabled
+                                    ? `disabled title="Release allocated units first"`
+                                    : ""
+                            }
+                        >
+                            Remove
+                        </button>
+                    </div>
                 </div>
             `;
         }).join("") ||
@@ -643,7 +672,12 @@ $("#transferDate").value = today();
 
 $("#refresh").addEventListener(
     "click",
-    loadData
+    () => window.location.reload()
+);
+
+$("#toolSelect").addEventListener(
+    "change",
+    updateAssignDescription
 );
 
 $("#search").addEventListener(
@@ -817,6 +851,79 @@ $("#addTool").addEventListener(
 $("#manageTools").addEventListener(
     "click",
     async event => {
+        const editButton =
+            event.target.closest(
+                "[data-edit-description]"
+            );
+
+        if (editButton) {
+            const tool = tools.find(item => {
+                return String(item.id) ===
+                    String(
+                        editButton.dataset
+                            .editDescription
+                    );
+            });
+
+            if (!tool) {
+                return;
+            }
+
+            const description = prompt(
+                `Edit the description for ${tool.name}:`,
+                tool.description || ""
+            );
+
+            if (description === null) {
+                return;
+            }
+
+            const cleanDescription =
+                description.trim();
+
+            if (!cleanDescription) {
+                showMessage(
+                    "The tool description cannot be empty.",
+                    "error"
+                );
+                return;
+            }
+
+            try {
+                const toolId = encodeURIComponent(
+                    tool.id
+                );
+
+                await api(
+                    `/rest/v1/tools?id=eq.${toolId}`,
+                    {
+                        admin: true,
+                        method: "PATCH",
+                        headers: {
+                            Prefer: "return=minimal"
+                        },
+                        body: JSON.stringify({
+                            description:
+                                cleanDescription
+                        })
+                    }
+                );
+
+                showMessage(
+                    "Tool description updated."
+                );
+
+                await loadData();
+            } catch (error) {
+                showMessage(
+                    error.message,
+                    "error"
+                );
+            }
+
+            return;
+        }
+
         const button =
             event.target.closest(
                 "[data-remove-tool]"
@@ -891,6 +998,38 @@ $("#assign").addEventListener(
         event.preventDefault();
 
         try {
+            const selectedToolId =
+                $("#toolSelect").value;
+
+            const description =
+                $("#assignDescription")
+                    .value
+                    .trim();
+
+            if (!selectedToolId || !description) {
+                showMessage(
+                    "Select a tool and enter its description.",
+                    "error"
+                );
+                return;
+            }
+
+            await api(
+                `/rest/v1/tools?id=eq.${encodeURIComponent(
+                    selectedToolId
+                )}`,
+                {
+                    admin: true,
+                    method: "PATCH",
+                    headers: {
+                        Prefer: "return=minimal"
+                    },
+                    body: JSON.stringify({
+                        description
+                    })
+                }
+            );
+
             await api(
                 "/rest/v1/rpc/assign_tool",
                 {
@@ -899,7 +1038,7 @@ $("#assign").addEventListener(
 
                     body: JSON.stringify({
                         p_tool_id:
-                            $("#toolSelect").value,
+                            selectedToolId,
 
                         p_technician:
                             $("#technician")
