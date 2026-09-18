@@ -1,34 +1,1093 @@
 "use strict";
-const URL="https://ncylczvijvdaiaamhmwk.supabase.co";
-const KEY="sb_publishable_hNUwSYtyf0jU7ARbvai3gw_1xbNlyMe";
-const ADMIN_EMAIL="mosesntella2018@gmail.com",ADMIN_USERNAME="ADMIN";
-let token=localStorage.getItem("hp_access")||"",tools=[],history=[];
-const $=s=>document.querySelector(s),esc=s=>String(s??"").replace(/[&<>'"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c]));
-const date=s=>s?new Date(s+"T00:00:00").toLocaleDateString("en-GB"):"—";
-const today=()=>new Date().toISOString().slice(0,10);
-function headers(admin=false){return {apikey:KEY,Authorization:`Bearer ${admin&&token?token:KEY}`,"Content-Type":"application/json"}}
-function msg(text,type="ok"){$("#message").textContent=text;$("#message").className=type;setTimeout(()=>{$("#message").textContent=""},4500)}
-async function api(path,options={}){const r=await fetch(URL+path,{...options,headers:{...headers(options.admin),...(options.headers||{})}});if(r.status===401&&options.admin){token="";localStorage.removeItem("hp_access");showAuth()}if(!r.ok){let e={};try{e=await r.json()}catch{}throw new Error(e.message||e.error_description||`Request failed (${r.status})`)}return r.status===204?null:r.json()}
-async function load(){
- try{[tools,history]=await Promise.all([api("/rest/v1/tools?select=*&order=name"),api("/rest/v1/tool_history?select=*&order=assigned_on.desc,created_at.desc")]);localStorage.setItem("hp_cache",JSON.stringify({tools,history}));render()}
- catch(e){const cache=JSON.parse(localStorage.getItem("hp_cache")||"null");if(cache){tools=cache.tools;history=cache.history;render();msg("Offline: showing the last synchronized records.","error")}else msg(e.message,"error")}
+
+/* =========================================================
+   SUPABASE CONFIGURATION
+   ========================================================= */
+
+const URL =
+    "https://ncylczvijvdaiaamhmwk.supabase.co";
+
+const KEY =
+    "sb_publishable_hNUwSYtyf0jU7ARbvai3gw_1xbNlyMe";
+
+const ADMIN_EMAIL =
+    "mosesntella2018@gmail.com";
+
+const ADMIN_USERNAME =
+    "ADMIN";
+
+const ADMIN_PASSWORD =
+    "Hotpoint_Tools";
+
+/* =========================================================
+   APPLICATION DATA
+   ========================================================= */
+
+let token =
+    localStorage.getItem("hp_access") || "";
+
+let tools = [];
+let history = [];
+
+/* =========================================================
+   HELPER FUNCTIONS
+   ========================================================= */
+
+const $ = selector =>
+    document.querySelector(selector);
+
+const escapeHTML = value => {
+    return String(value ?? "").replace(
+        /[&<>'"]/g,
+        character => {
+            return {
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                "'": "&#39;",
+                '"': "&quot;"
+            }[character];
+        }
+    );
+};
+
+const formatDate = value => {
+    if (!value) {
+        return "—";
+    }
+
+    return new Date(
+        `${value}T00:00:00`
+    ).toLocaleDateString("en-GB");
+};
+
+const today = () =>
+    new Date().toISOString().slice(0, 10);
+
+/* =========================================================
+   SUPABASE REQUEST HEADERS
+   ========================================================= */
+
+function createHeaders(admin = false) {
+    return {
+        apikey: KEY,
+
+        Authorization:
+            `Bearer ${
+                admin && token
+                    ? token
+                    : KEY
+            }`,
+
+        "Content-Type": "application/json"
+    };
 }
-function active(){return history.filter(h=>!h.ended_on)}
-function render(){
- const allocations=active(),q=$("#search").value.toLowerCase();
- $("#total").textContent=tools.reduce((n,t)=>n+t.quantity,0);$("#out").textContent=allocations.length;$("#free").textContent=Math.max(0,tools.reduce((n,t)=>n+t.quantity,0)-allocations.length);
- $("#tools").innerHTML=tools.filter(t=>{const a=allocations.filter(x=>x.tool_id===t.id);return `${t.name} ${t.description} ${a.map(x=>x.technician+" "+x.site)}`.toLowerCase().includes(q)}).map(t=>{const a=allocations.filter(x=>x.tool_id===t.id),free=Math.max(0,t.quantity-a.length);return `<article class="tool"><h3>${esc(t.name)}</h3><small>${esc(t.description)}</small><div class="counts"><span>Total: ${t.quantity}</span><span>Free: ${free}</span><span>Out: ${a.length}</span></div>${a.map(x=>`<div class="holder"><b>${esc(x.technician)}</b><br><small>${esc(x.site)} • ${date(x.assigned_on)}</small></div>`).join("")}</article>`}).join("")||"No matching tools.";
- $("#history").innerHTML=history.map(h=>`<tr><td>${esc(h.technician)}</td><td>${esc(h.site)}</td><td>${esc(tools.find(t=>t.id===h.tool_id)?.name||"Tool")}</td><td>${date(h.assigned_on)}</td><td>${date(h.ended_on)}</td><td>${esc(h.action)}</td></tr>`).join("");
- const freeTools=tools.filter(t=>allocations.filter(a=>a.tool_id===t.id).length<t.quantity);$("#toolSelect").innerHTML=freeTools.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join("");
- $("#active").innerHTML=allocations.map(a=>`<div class="allocation"><span><b>${esc(tools.find(t=>t.id===a.tool_id)?.name||"Tool")}</b><br>${esc(a.technician)} • ${esc(a.site)} • ${date(a.assigned_on)}</span><div class="actions"><button data-transfer="${a.id}">Transfer</button><button class="dark" data-release="${a.id}">Release</button></div></div>`).join("")||"No tools are currently allocated.";
+
+/* =========================================================
+   USER MESSAGES
+   ========================================================= */
+
+function showMessage(text, type = "ok") {
+    const message = $("#message");
+
+    message.textContent = text;
+    message.className = type;
+
+    setTimeout(() => {
+        message.textContent = "";
+        message.className = "";
+    }, 4500);
 }
-function showAuth(){const logged=!!token;$("#login").hidden=logged;$("#adminPanel").hidden=!logged}
-document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{document.querySelectorAll("nav button").forEach(x=>x.classList.remove("active"));b.classList.add("active");const admin=b.dataset.view==="admin";$("#publicView").hidden=admin;$("#adminView").hidden=!admin;showAuth()});
-$("#refresh").onclick=load;$("#search").oninput=render;$("#assignDate").value=today();$("#transferDate").value=today();
-$("#login").onsubmit=async e=>{e.preventDefault();if($("#username").value.trim().toUpperCase()!==ADMIN_USERNAME){msg("Incorrect username or password.","error");return}try{const r=await api("/auth/v1/token?grant_type=password",{method:"POST",body:JSON.stringify({email:ADMIN_EMAIL,password:$("#password").value})});token=r.access_token;localStorage.setItem("hp_access",token);showAuth();msg("Administrator signed in.");await load()}catch(x){msg("Incorrect username or password.","error")}};
-$("#logout").onclick=()=>{token="";localStorage.removeItem("hp_access");showAuth();msg("Signed out.")};
-$("#addTool").onsubmit=async e=>{e.preventDefault();try{await api("/rest/v1/tools",{admin:true,method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify({name:$("#toolName").value.trim(),quantity:Number($("#quantity").value),description:$("#description").value.trim()})});e.target.reset();$("#quantity").value=1;msg("Tool added.");await load()}catch(x){msg(x.message,"error")}};
-$("#assign").onsubmit=async e=>{e.preventDefault();try{await api("/rest/v1/rpc/assign_tool",{admin:true,method:"POST",body:JSON.stringify({p_tool_id:$("#toolSelect").value,p_technician:$("#technician").value.trim(),p_site:$("#site").value.trim(),p_date:$("#assignDate").value})});e.target.reset();$("#assignDate").value=today();msg("Tool assigned.");await load()}catch(x){msg(x.message,"error")}};
-$("#active").onclick=async e=>{const release=e.target.dataset.release,transfer=e.target.dataset.transfer;if(release&&confirm("Release this tool?")){try{await api("/rest/v1/rpc/release_tool",{admin:true,method:"POST",body:JSON.stringify({p_history_id:release,p_date:today()})});msg("Tool released.");await load()}catch(x){msg(x.message,"error")}}if(transfer){const a=history.find(h=>h.id===transfer);$("#historyId").value=transfer;$("#transferText").textContent=`Transfer from ${a.technician} at ${a.site}`;$("#transferDate").value=today();$("#transfer").showModal()}};
-$("#cancel").onclick=()=>$("#transfer").close();$("#transferForm").onsubmit=async e=>{e.preventDefault();try{await api("/rest/v1/rpc/transfer_tool",{admin:true,method:"POST",body:JSON.stringify({p_history_id:$("#historyId").value,p_technician:$("#newTechnician").value.trim(),p_site:$("#newSite").value.trim(),p_date:$("#transferDate").value})});$("#transfer").close();e.target.reset();msg("Tool transferred.");await load()}catch(x){msg(x.message,"error")}};
-showAuth();load();setInterval(load,60000);
+
+/* =========================================================
+   SUPABASE API REQUEST
+   Handles empty responses without producing a JSON error.
+   ========================================================= */
+
+async function api(path, options = {}) {
+    const response = await fetch(
+        URL + path,
+        {
+            ...options,
+
+            headers: {
+                ...createHeaders(options.admin),
+                ...(options.headers || {})
+            }
+        }
+    );
+
+    if (
+        response.status === 401 &&
+        options.admin
+    ) {
+        token = "";
+
+        localStorage.removeItem("hp_access");
+
+        showAuthentication();
+    }
+
+    /*
+     * Supabase may return an empty response after a
+     * successful INSERT, UPDATE or DELETE operation.
+     */
+
+    const responseText =
+        await response.text();
+
+    let responseData = null;
+
+    if (responseText) {
+        try {
+            responseData =
+                JSON.parse(responseText);
+        } catch (error) {
+            responseData = responseText;
+        }
+    }
+
+    if (!response.ok) {
+        const errorData =
+            responseData &&
+            typeof responseData === "object"
+                ? responseData
+                : {};
+
+        throw new Error(
+            errorData.message ||
+            errorData.error_description ||
+            errorData.details ||
+            `Request failed (${response.status})`
+        );
+    }
+
+    return responseData;
+}
+
+/* =========================================================
+   LOAD SHARED DATA
+   ========================================================= */
+
+async function loadData() {
+    try {
+        const requests = await Promise.all([
+            api(
+                "/rest/v1/tools" +
+                "?select=*" +
+                "&order=name"
+            ),
+
+            api(
+                "/rest/v1/tool_history" +
+                "?select=*" +
+                "&order=assigned_on.desc,created_at.desc"
+            )
+        ]);
+
+        tools = requests[0] || [];
+        history = requests[1] || [];
+
+        localStorage.setItem(
+            "hp_cache",
+            JSON.stringify({
+                tools,
+                history
+            })
+        );
+
+        renderApplication();
+    } catch (error) {
+        const cachedData = JSON.parse(
+            localStorage.getItem("hp_cache") ||
+            "null"
+        );
+
+        if (cachedData) {
+            tools = cachedData.tools || [];
+            history = cachedData.history || [];
+
+            renderApplication();
+
+            showMessage(
+                "Offline: showing the last synchronized records.",
+                "error"
+            );
+        } else {
+            showMessage(
+                error.message,
+                "error"
+            );
+        }
+    }
+}
+
+/* =========================================================
+   ACTIVE ALLOCATIONS
+   ========================================================= */
+
+function getActiveAllocations() {
+    return history.filter(record => {
+        return !record.ended_on;
+    });
+}
+
+/* =========================================================
+   RENDER APPLICATION
+   ========================================================= */
+
+function renderApplication() {
+    const allocations =
+        getActiveAllocations();
+
+    const searchText =
+        $("#search").value.toLowerCase();
+
+    const totalUnits = tools.reduce(
+        (total, tool) => {
+            return total + tool.quantity;
+        },
+        0
+    );
+
+    $("#total").textContent =
+        totalUnits;
+
+    $("#out").textContent =
+        allocations.length;
+
+    $("#free").textContent =
+        Math.max(
+            0,
+            totalUnits - allocations.length
+        );
+
+    renderPublicTools(
+        allocations,
+        searchText
+    );
+
+    renderHistory();
+
+    renderToolOptions(allocations);
+
+    renderActiveAllocations(allocations);
+
+    renderToolManagement(allocations);
+}
+
+/* =========================================================
+   RENDER PUBLIC TOOLS
+   ========================================================= */
+
+function renderPublicTools(
+    allocations,
+    searchText
+) {
+    const matchingTools = tools.filter(tool => {
+        const toolAllocations =
+            allocations.filter(record => {
+                return (
+                    record.tool_id === tool.id
+                );
+            });
+
+        const searchableText = `
+            ${tool.name}
+            ${tool.description}
+            ${toolAllocations.map(record => {
+                return (
+                    record.technician +
+                    " " +
+                    record.site
+                );
+            }).join(" ")}
+        `.toLowerCase();
+
+        return searchableText.includes(
+            searchText
+        );
+    });
+
+    $("#tools").innerHTML =
+        matchingTools.map(tool => {
+            const toolAllocations =
+                allocations.filter(record => {
+                    return (
+                        record.tool_id ===
+                        tool.id
+                    );
+                });
+
+            const availableQuantity =
+                Math.max(
+                    0,
+                    tool.quantity -
+                    toolAllocations.length
+                );
+
+            return `
+                <article class="tool">
+                    <h3>
+                        ${escapeHTML(tool.name)}
+                    </h3>
+
+                    <small>
+                        ${escapeHTML(
+                            tool.description
+                        )}
+                    </small>
+
+                    <div class="counts">
+                        <span>
+                            Total: ${tool.quantity}
+                        </span>
+
+                        <span>
+                            Free: ${availableQuantity}
+                        </span>
+
+                        <span>
+                            Out: ${toolAllocations.length}
+                        </span>
+                    </div>
+
+                    ${toolAllocations.map(record => {
+                        return `
+                            <div class="holder">
+                                <b>
+                                    ${escapeHTML(
+                                        record.technician
+                                    )}
+                                </b>
+
+                                <br>
+
+                                <small>
+                                    ${escapeHTML(
+                                        record.site
+                                    )}
+                                    •
+                                    ${formatDate(
+                                        record.assigned_on
+                                    )}
+                                </small>
+                            </div>
+                        `;
+                    }).join("")}
+                </article>
+            `;
+        }).join("") ||
+        "No matching tools.";
+}
+
+/* =========================================================
+   RENDER HISTORY
+   ========================================================= */
+
+function renderHistory() {
+    $("#history").innerHTML =
+        history.map(record => {
+            const tool = tools.find(item => {
+                return (
+                    item.id === record.tool_id
+                );
+            });
+
+            return `
+                <tr>
+                    <td>
+                        ${escapeHTML(
+                            record.technician
+                        )}
+                    </td>
+
+                    <td>
+                        ${escapeHTML(record.site)}
+                    </td>
+
+                    <td>
+                        ${escapeHTML(
+                            tool?.name ||
+                            "Removed tool"
+                        )}
+                    </td>
+
+                    <td>
+                        ${formatDate(
+                            record.assigned_on
+                        )}
+                    </td>
+
+                    <td>
+                        ${formatDate(
+                            record.ended_on
+                        )}
+                    </td>
+
+                    <td>
+                        ${escapeHTML(
+                            record.action
+                        )}
+                    </td>
+                </tr>
+            `;
+        }).join("");
+}
+
+/* =========================================================
+   RENDER ASSIGNMENT DROPDOWN
+   ========================================================= */
+
+function renderToolOptions(allocations) {
+    const availableTools =
+        tools.filter(tool => {
+            const allocationCount =
+                allocations.filter(record => {
+                    return (
+                        record.tool_id ===
+                        tool.id
+                    );
+                }).length;
+
+            return (
+                allocationCount <
+                tool.quantity
+            );
+        });
+
+    $("#toolSelect").innerHTML =
+        availableTools.map(tool => {
+            return `
+                <option value="${tool.id}">
+                    ${escapeHTML(tool.name)}
+                </option>
+            `;
+        }).join("");
+}
+
+/* =========================================================
+   RENDER ACTIVE ALLOCATIONS
+   ========================================================= */
+
+function renderActiveAllocations(
+    allocations
+) {
+    $("#active").innerHTML =
+        allocations.map(record => {
+            const tool = tools.find(item => {
+                return (
+                    item.id ===
+                    record.tool_id
+                );
+            });
+
+            return `
+                <div class="allocation">
+                    <span>
+                        <b>
+                            ${escapeHTML(
+                                tool?.name ||
+                                "Tool"
+                            )}
+                        </b>
+
+                        <br>
+
+                        ${escapeHTML(
+                            record.technician
+                        )}
+                        •
+                        ${escapeHTML(record.site)}
+                        •
+                        ${formatDate(
+                            record.assigned_on
+                        )}
+                    </span>
+
+                    <div class="actions">
+                        <button
+                            data-transfer="${record.id}"
+                        >
+                            Transfer
+                        </button>
+
+                        <button
+                            class="dark"
+                            data-release="${record.id}"
+                        >
+                            Release
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join("") ||
+        "No tools are currently allocated.";
+}
+
+/* =========================================================
+   RENDER TOOL MANAGEMENT
+   ========================================================= */
+
+function renderToolManagement(
+    allocations
+) {
+    $("#manageTools").innerHTML =
+        tools.map(tool => {
+            const allocatedQuantity =
+                allocations.filter(record => {
+                    return (
+                        record.tool_id ===
+                        tool.id
+                    );
+                }).length;
+
+            const disabled =
+                allocatedQuantity > 0;
+
+            return `
+                <div class="managed-tool">
+                    <span>
+                        <b>
+                            ${escapeHTML(tool.name)}
+                        </b>
+
+                        <small>
+                            ${tool.quantity} total
+                            •
+                            ${allocatedQuantity}
+                            currently allocated
+                        </small>
+                    </span>
+
+                    <button
+                        class="remove"
+                        data-remove-tool="${tool.id}"
+                        data-tool-name="${escapeHTML(
+                            tool.name
+                        )}"
+                        ${
+                            disabled
+                                ? `disabled title="Release allocated units first"`
+                                : ""
+                        }
+                    >
+                        Remove
+                    </button>
+                </div>
+            `;
+        }).join("") ||
+        "No tools have been added.";
+}
+
+/* =========================================================
+   AUTHENTICATION DISPLAY
+   ========================================================= */
+
+function showAuthentication() {
+    const loggedIn = Boolean(token);
+
+    $("#login").hidden = loggedIn;
+    $("#adminPanel").hidden = !loggedIn;
+}
+
+/* =========================================================
+   PAGE NAVIGATION
+   ========================================================= */
+
+document
+    .querySelectorAll("nav button")
+    .forEach(button => {
+        button.addEventListener(
+            "click",
+            () => {
+                document
+                    .querySelectorAll(
+                        "nav button"
+                    )
+                    .forEach(item => {
+                        item.classList.remove(
+                            "active"
+                        );
+                    });
+
+                button.classList.add(
+                    "active"
+                );
+
+                const adminPage =
+                    button.dataset.view ===
+                    "admin";
+
+                $("#publicView").hidden =
+                    adminPage;
+
+                $("#adminView").hidden =
+                    !adminPage;
+
+                showAuthentication();
+            }
+        );
+    });
+
+/* =========================================================
+   DEFAULT VALUES
+   ========================================================= */
+
+$("#assignDate").value = today();
+$("#transferDate").value = today();
+
+/* =========================================================
+   REFRESH AND SEARCH
+   ========================================================= */
+
+$("#refresh").addEventListener(
+    "click",
+    loadData
+);
+
+$("#search").addEventListener(
+    "input",
+    renderApplication
+);
+
+/* =========================================================
+   ADMIN LOGIN
+   ========================================================= */
+
+$("#login").addEventListener(
+    "submit",
+    async event => {
+        event.preventDefault();
+
+        const username =
+            $("#username")
+                .value
+                .trim()
+                .toUpperCase();
+
+        const password =
+            $("#password").value;
+
+        if (
+            username !== ADMIN_USERNAME ||
+            password !== ADMIN_PASSWORD
+        ) {
+            showMessage(
+                "Incorrect username or password.",
+                "error"
+            );
+
+            return;
+        }
+
+        try {
+            const response = await api(
+                "/auth/v1/token" +
+                "?grant_type=password",
+                {
+                    method: "POST",
+
+                    body: JSON.stringify({
+                        email: ADMIN_EMAIL,
+                        password
+                    })
+                }
+            );
+
+            token = response.access_token;
+
+            localStorage.setItem(
+                "hp_access",
+                token
+            );
+
+            showAuthentication();
+
+            showMessage(
+                "Administrator signed in."
+            );
+
+            await loadData();
+        } catch (error) {
+            showMessage(
+                "Supabase rejected the login. " +
+                "Set the admin user's " +
+                "Supabase password to " +
+                "Hotpoint_Tools.",
+                "error"
+            );
+        }
+    }
+);
+
+/* =========================================================
+   ADMIN LOGOUT
+   ========================================================= */
+
+$("#logout").addEventListener(
+    "click",
+    () => {
+        token = "";
+
+        localStorage.removeItem(
+            "hp_access"
+        );
+
+        showAuthentication();
+
+        showMessage("Signed out.");
+    }
+);
+
+/* =========================================================
+   ADD TOOL
+   ========================================================= */
+
+$("#addTool").addEventListener(
+    "submit",
+    async event => {
+        event.preventDefault();
+
+        const name =
+            $("#toolName").value.trim();
+
+        const quantity =
+            Number($("#quantity").value);
+
+        const description =
+            $("#description").value.trim();
+
+        if (
+            !name ||
+            !description ||
+            !Number.isInteger(quantity) ||
+            quantity < 1
+        ) {
+            showMessage(
+                "Enter a valid tool name, quantity and description.",
+                "error"
+            );
+
+            return;
+        }
+
+        try {
+            await api(
+                "/rest/v1/tools",
+                {
+                    admin: true,
+                    method: "POST",
+
+                    headers: {
+                        Prefer:
+                            "return=minimal"
+                    },
+
+                    body: JSON.stringify({
+                        name,
+                        quantity,
+                        description
+                    })
+                }
+            );
+
+            event.target.reset();
+
+            $("#quantity").value = 1;
+
+            showMessage(
+                "Tool added successfully."
+            );
+
+            await loadData();
+        } catch (error) {
+            showMessage(
+                error.message,
+                "error"
+            );
+        }
+    }
+);
+
+/* =========================================================
+   REMOVE TOOL
+   ========================================================= */
+
+$("#manageTools").addEventListener(
+    "click",
+    async event => {
+        const button =
+            event.target.closest(
+                "[data-remove-tool]"
+            );
+
+        if (!button || button.disabled) {
+            return;
+        }
+
+        const toolName =
+            button.dataset.toolName;
+
+        const shouldRemove = confirm(
+            `Remove ${toolName}?`
+        );
+
+        if (!shouldRemove) {
+            return;
+        }
+
+        try {
+            const toolId =
+                encodeURIComponent(
+                    button.dataset.removeTool
+                );
+
+            await api(
+                `/rest/v1/tools?id=eq.${toolId}`,
+                {
+                    admin: true,
+                    method: "DELETE",
+
+                    headers: {
+                        Prefer:
+                            "return=minimal"
+                    }
+                }
+            );
+
+            showMessage(
+                `${toolName} removed.`
+            );
+
+            await loadData();
+        } catch (error) {
+            const errorMessage =
+                /foreign key|violates/i.test(
+                    error.message
+                )
+                    ? (
+                        "This tool has allocation " +
+                        "history and cannot be " +
+                        "permanently deleted."
+                    )
+                    : error.message;
+
+            showMessage(
+                errorMessage,
+                "error"
+            );
+        }
+    }
+);
+
+/* =========================================================
+   ASSIGN TOOL
+   ========================================================= */
+
+$("#assign").addEventListener(
+    "submit",
+    async event => {
+        event.preventDefault();
+
+        try {
+            await api(
+                "/rest/v1/rpc/assign_tool",
+                {
+                    admin: true,
+                    method: "POST",
+
+                    body: JSON.stringify({
+                        p_tool_id:
+                            $("#toolSelect").value,
+
+                        p_technician:
+                            $("#technician")
+                                .value
+                                .trim(),
+
+                        p_site:
+                            $("#site")
+                                .value
+                                .trim(),
+
+                        p_date:
+                            $("#assignDate").value
+                    })
+                }
+            );
+
+            event.target.reset();
+
+            $("#assignDate").value =
+                today();
+
+            showMessage(
+                "Tool assigned successfully."
+            );
+
+            await loadData();
+        } catch (error) {
+            showMessage(
+                error.message,
+                "error"
+            );
+        }
+    }
+);
+
+/* =========================================================
+   RELEASE OR OPEN TRANSFER
+   ========================================================= */
+
+$("#active").addEventListener(
+    "click",
+    async event => {
+        const releaseId =
+            event.target.dataset.release;
+
+        const transferId =
+            event.target.dataset.transfer;
+
+        if (
+            releaseId &&
+            confirm("Release this tool?")
+        ) {
+            try {
+                await api(
+                    "/rest/v1/rpc/release_tool",
+                    {
+                        admin: true,
+                        method: "POST",
+
+                        body: JSON.stringify({
+                            p_history_id:
+                                releaseId,
+
+                            p_date: today()
+                        })
+                    }
+                );
+
+                showMessage(
+                    "Tool released."
+                );
+
+                await loadData();
+            } catch (error) {
+                showMessage(
+                    error.message,
+                    "error"
+                );
+            }
+        }
+
+        if (transferId) {
+            const allocation =
+                history.find(record => {
+                    return (
+                        record.id ===
+                        transferId
+                    );
+                });
+
+            if (!allocation) {
+                return;
+            }
+
+            $("#historyId").value =
+                transferId;
+
+            $("#transferText").textContent =
+                `Transfer from ` +
+                `${allocation.technician} ` +
+                `at ${allocation.site}`;
+
+            $("#transferDate").value =
+                today();
+
+            $("#transfer").showModal();
+        }
+    }
+);
+
+/* =========================================================
+   CANCEL TRANSFER
+   ========================================================= */
+
+$("#cancel").addEventListener(
+    "click",
+    () => {
+        $("#transfer").close();
+    }
+);
+
+/* =========================================================
+   CONFIRM TRANSFER
+   ========================================================= */
+
+$("#transferForm").addEventListener(
+    "submit",
+    async event => {
+        event.preventDefault();
+
+        try {
+            await api(
+                "/rest/v1/rpc/transfer_tool",
+                {
+                    admin: true,
+                    method: "POST",
+
+                    body: JSON.stringify({
+                        p_history_id:
+                            $("#historyId").value,
+
+                        p_technician:
+                            $("#newTechnician")
+                                .value
+                                .trim(),
+
+                        p_site:
+                            $("#newSite")
+                                .value
+                                .trim(),
+
+                        p_date:
+                            $("#transferDate").value
+                    })
+                }
+            );
+
+            $("#transfer").close();
+
+            event.target.reset();
+
+            showMessage(
+                "Tool transferred."
+            );
+
+            await loadData();
+        } catch (error) {
+            showMessage(
+                error.message,
+                "error"
+            );
+        }
+    }
+);
+
+/* =========================================================
+   START APPLICATION
+   ========================================================= */
+
+showAuthentication();
+loadData();
+
+/*
+ * Refresh shared records every 60 seconds.
+ */
+
+setInterval(
+    loadData,
+    60000
+);
