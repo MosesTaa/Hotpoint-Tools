@@ -1,6 +1,456 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Hotpoint Tools Tracker</title><link rel="stylesheet" href="style.css"></head><body>
-<header><div class="stripe"></div><div class="head"><b>H</b><span><strong>HOTPOINT</strong> <em>TOOLS</em><small>SHARED INVENTORY TRACKER</small></span><button id="refresh">Refresh</button></div></header>
-<main><nav><button data-view="public" class="active">Tools & History</button><button data-view="admin">Admin</button></nav><div id="message"></div>
-<section id="publicView"><div class="hero"><p>HOTPOINT APPLIANCES</p><h1>Tools Tracker</h1><span>Live tool availability and transfer history shared across every installation.</span></div><div class="summary"><article>Total<strong id="total">0</strong></article><article>Available<strong id="free">0</strong></article><article>Allocated<strong id="out">0</strong></article></div><section class="card"><div class="title"><h2>Current Tool Status</h2><input id="search" placeholder="Search tool, technician or site"></div><div id="tools" class="grid"></div></section><section class="card"><h2>Allocation & Transfer History</h2><div class="table"><table><thead><tr><th>Technician</th><th>Site</th><th>Tool</th><th>Assigned</th><th>Ended</th><th>Action</th></tr></thead><tbody id="history"></tbody></table></div></section></section>
-<section id="adminView" hidden><form id="login" class="card login"><h2>Administrator Login</h2><label>Username<input id="username" type="text" value="ADMIN" autocomplete="username" required></label><label>Password<input id="password" type="password" autocomplete="current-password" required></label><button>Sign In</button></form><div id="adminPanel" hidden><div class="admin-title"><h1>Inventory Management</h1><button id="logout" class="dark">Log Out</button></div><div class="forms"><form id="addTool" class="card"><h2>Add Tool</h2><label>Name<input id="toolName" required></label><label>Quantity<input id="quantity" type="number" min="1" value="1" required></label><label>Description<textarea id="description" required></textarea></label><button>Add Tool</button></form><form id="assign" class="card"><h2>Assign Tool</h2><label>Tool<select id="toolSelect"></select></label><label>Technician<input id="technician" required></label><label>Site<input id="site" required></label><label>Date<input id="assignDate" type="date" required></label><button>Assign</button></form></div><section class="card"><h2>Manage Tools</h2><p class="hint">Tools currently assigned must first be released.</p><div id="manageTools"></div></section><section class="card"><h2>Active Allocations</h2><div id="active"></div></section></div></section>
-</main><dialog id="transfer"><form id="transferForm" method="dialog"><h2>Transfer Tool</h2><p id="transferText"></p><input id="historyId" type="hidden"><label>New technician<input id="newTechnician" required></label><label>New site<input id="newSite" required></label><label>Transfer date<input id="transferDate" type="date" required></label><div class="actions"><button type="button" id="cancel" class="dark">Cancel</button><button>Confirm Transfer</button></div></form></dialog><footer>Hotpoint Tools Tracker • Shared Supabase records</footer><script src="app.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1"
+    >
+
+    <title>Hotpoint Tools Tracker</title>
+
+    <link
+        rel="stylesheet"
+        href="style.css"
+    >
+</head>
+
+<body>
+
+    <header>
+        <div class="stripe"></div>
+
+        <div class="head">
+            <b>H</b>
+
+            <span>
+                <strong>HOTPOINT</strong>
+                <em>TOOLS</em>
+
+                <small>
+                    SHARED INVENTORY TRACKER
+                </small>
+            </span>
+
+            <button
+                id="refresh"
+                type="button"
+            >
+                Refresh
+            </button>
+        </div>
+    </header>
+
+    <main>
+
+        <nav>
+            <button
+                type="button"
+                data-view="public"
+                class="active"
+            >
+                Tools &amp; History
+            </button>
+
+            <button
+                type="button"
+                data-view="admin"
+            >
+                Admin
+            </button>
+        </nav>
+
+        <div
+            id="message"
+            role="status"
+            aria-live="polite"
+        ></div>
+
+        <!-- ================================================
+             PUBLIC PAGE
+             ================================================ -->
+
+        <section id="publicView">
+
+            <div class="hero">
+                <p>HOTPOINT APPLIANCES</p>
+
+                <h1>Tools Tracker</h1>
+
+                <span>
+                    Live tool availability and transfer history
+                    shared across every installation.
+                </span>
+            </div>
+
+            <div class="summary">
+                <article>
+                    Total
+                    <strong id="total">0</strong>
+                </article>
+
+                <article>
+                    Available
+                    <strong id="free">0</strong>
+                </article>
+
+                <article>
+                    Allocated
+                    <strong id="out">0</strong>
+                </article>
+            </div>
+
+            <section class="card">
+                <div class="title">
+                    <h2>Current Tool Status</h2>
+
+                    <input
+                        id="search"
+                        type="search"
+                        placeholder="Search tool, technician or site"
+                    >
+                </div>
+
+                <div
+                    id="tools"
+                    class="grid"
+                ></div>
+            </section>
+
+            <section class="card">
+                <h2>
+                    Allocation &amp; Transfer History
+                </h2>
+
+                <div class="table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Technician</th>
+                                <th>Site</th>
+                                <th>Tool</th>
+                                <th>Assigned</th>
+                                <th>Ended</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+
+                        <tbody id="history"></tbody>
+                    </table>
+                </div>
+            </section>
+
+        </section>
+
+        <!-- ================================================
+             ADMIN PAGE
+             ================================================ -->
+
+        <section
+            id="adminView"
+            hidden
+        >
+
+            <form
+                id="login"
+                class="card login"
+            >
+                <h2>Administrator Login</h2>
+
+                <label>
+                    Username
+
+                    <input
+                        id="username"
+                        type="text"
+                        value="ADMIN"
+                        autocomplete="username"
+                        required
+                    >
+                </label>
+
+                <label>
+                    Password
+
+                    <input
+                        id="password"
+                        type="password"
+                        autocomplete="current-password"
+                        required
+                    >
+                </label>
+
+                <button type="submit">
+                    Sign In
+                </button>
+            </form>
+
+            <div
+                id="adminPanel"
+                hidden
+            >
+
+                <div class="admin-title">
+                    <div>
+                        <p class="section-label">
+                            ADMINISTRATION
+                        </p>
+
+                        <h1>
+                            Inventory Management
+                        </h1>
+                    </div>
+
+                    <button
+                        id="logout"
+                        class="dark"
+                        type="button"
+                    >
+                        Log Out
+                    </button>
+                </div>
+
+                <div class="forms">
+
+                    <!-- ADD TOOL -->
+
+                    <form
+                        id="addTool"
+                        class="card"
+                    >
+                        <h2>Add Tool</h2>
+
+                        <p class="form-description">
+                            Add the tool name, quantity and
+                            description.
+                        </p>
+
+                        <label>
+                            Tool name
+
+                            <input
+                                id="toolName"
+                                type="text"
+                                placeholder="Example: Vacuum pump"
+                                required
+                            >
+                        </label>
+
+                        <label>
+                            Quantity
+
+                            <input
+                                id="quantity"
+                                type="number"
+                                min="1"
+                                step="1"
+                                value="1"
+                                required
+                            >
+                        </label>
+
+                        <label>
+                            Description
+
+                            <textarea
+                                id="description"
+                                rows="4"
+                                placeholder="Describe the tool, its use or identification details"
+                                required
+                            ></textarea>
+                        </label>
+
+                        <button type="submit">
+                            Add Tool
+                        </button>
+                    </form>
+
+                    <!-- ASSIGN TOOL -->
+
+                    <form
+                        id="assign"
+                        class="card"
+                    >
+                        <h2>Assign Tool</h2>
+
+                        <p class="form-description">
+                            Assign an available tool to a
+                            technician and site.
+                        </p>
+
+                        <label>
+                            Tool
+
+                            <select
+                                id="toolSelect"
+                                required
+                            ></select>
+                        </label>
+
+                        <label>
+                            Technician
+
+                            <input
+                                id="technician"
+                                type="text"
+                                placeholder="Technician name"
+                                required
+                            >
+                        </label>
+
+                        <label>
+                            Site
+
+                            <input
+                                id="site"
+                                type="text"
+                                placeholder="Site name"
+                                required
+                            >
+                        </label>
+
+                        <label>
+                            Date assigned
+
+                            <input
+                                id="assignDate"
+                                type="date"
+                                required
+                            >
+                        </label>
+
+                        <button type="submit">
+                            Assign Tool
+                        </button>
+                    </form>
+
+                </div>
+
+                <!-- MANAGE TOOLS -->
+
+                <section class="card manage-tools-card">
+                    <div class="card-heading">
+                        <div>
+                            <p class="section-label">
+                                TOOL DETAILS
+                            </p>
+
+                            <h2>Manage Tools</h2>
+
+                            <p class="hint">
+                                Change each tool’s quantity or
+                                description, then select Save Changes.
+                                Allocated tools must be released before
+                                removal.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!--
+                        app.js inserts each tool here with:
+                        - Tool name
+                        - Current description
+                        - Editable quantity
+                        - Editable description
+                        - Save Changes button
+                        - Remove button
+                    -->
+
+                    <div id="manageTools"></div>
+                </section>
+
+                <!-- ACTIVE ALLOCATIONS -->
+
+                <section class="card">
+                    <div class="card-heading">
+                        <div>
+                            <p class="section-label">
+                                CURRENTLY OUT
+                            </p>
+
+                            <h2>Active Allocations</h2>
+                        </div>
+                    </div>
+
+                    <div id="active"></div>
+                </section>
+
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- ================================================
+         TRANSFER DIALOG
+         ================================================ -->
+
+    <dialog id="transfer">
+        <form
+            id="transferForm"
+            method="dialog"
+        >
+            <h2>Transfer Tool</h2>
+
+            <p id="transferText"></p>
+
+            <input
+                id="historyId"
+                type="hidden"
+            >
+
+            <label>
+                New technician
+
+                <input
+                    id="newTechnician"
+                    type="text"
+                    required
+                >
+            </label>
+
+            <label>
+                New site
+
+                <input
+                    id="newSite"
+                    type="text"
+                    required
+                >
+            </label>
+
+            <label>
+                Transfer date
+
+                <input
+                    id="transferDate"
+                    type="date"
+                    required
+                >
+            </label>
+
+            <div class="actions">
+                <button
+                    type="button"
+                    id="cancel"
+                    class="dark"
+                >
+                    Cancel
+                </button>
+
+                <button type="submit">
+                    Confirm Transfer
+                </button>
+            </div>
+        </form>
+    </dialog>
+
+    <footer>
+        Hotpoint Tools Tracker • Shared Supabase records
+    </footer>
+
+    <script src="app.js"></script>
+
+</body>
+</html>
