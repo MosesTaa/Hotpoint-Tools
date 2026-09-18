@@ -289,6 +289,17 @@
                         </label>
 
                         <label>
+                            Tool description
+
+                            <textarea
+                                id="assignDescription"
+                                rows="3"
+                                placeholder="Add or update the selected tool description"
+                                required
+                            ></textarea>
+                        </label>
+
+                        <label>
                             Technician
 
                             <input
@@ -339,8 +350,8 @@
                             <h2>Manage Tools</h2>
 
                             <p class="hint">
-                                Change each tool’s quantity or
-                                description, then select Save Changes.
+                                View each tool’s description or select
+                                Edit Description to update it.
                                 Allocated tools must be released before
                                 removal.
                             </p>
@@ -351,9 +362,7 @@
                         app.js inserts each tool here with:
                         - Tool name
                         - Current description
-                        - Editable quantity
-                        - Editable description
-                        - Save Changes button
+                        - Edit Description button
                         - Remove button
                     -->
 
