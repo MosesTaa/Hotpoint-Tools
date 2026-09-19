@@ -295,6 +295,7 @@ function renderPublicTools(
         const searchableText = `
             ${tool.name}
             ${tool.description}
+            ${toolAllocations.map(record => record.tool_number || "").join(" ")}
             ${toolAllocations.map(record => {
                 return (
                     record.technician +
@@ -364,6 +365,10 @@ function renderPublicTools(
                                 <br>
 
                                 <small>
+                                    Tool No: ${escapeHTML(
+                                        record.tool_number || "Not recorded"
+                                    )}
+                                    •
                                     ${escapeHTML(
                                         record.site
                                     )}
@@ -410,6 +415,13 @@ function renderHistory() {
                         ${escapeHTML(
                             tool?.name ||
                             "Removed tool"
+                        )}
+                    </td>
+
+                    <td>
+                        ${escapeHTML(
+                            record.tool_number ||
+                            "Not recorded"
                         )}
                     </td>
 
@@ -465,17 +477,6 @@ function renderToolOptions(allocations) {
             `;
         }).join("");
 
-    updateAssignDescription();
-}
-
-function updateAssignDescription() {
-    const selectedTool = tools.find(tool => {
-        return String(tool.id) ===
-            String($("#toolSelect").value);
-    });
-
-    $("#assignDescription").value =
-        selectedTool?.description || "";
 }
 
 /* =========================================================
@@ -503,6 +504,15 @@ function renderActiveAllocations(
                                 "Tool"
                             )}
                         </b>
+
+                        <br>
+
+                        <small>
+                            Tool No: ${escapeHTML(
+                                record.tool_number ||
+                                "Not recorded"
+                            )}
+                        </small>
 
                         <br>
 
@@ -673,11 +683,6 @@ $("#transferDate").value = today();
 $("#refresh").addEventListener(
     "click",
     () => window.location.reload()
-);
-
-$("#toolSelect").addEventListener(
-    "change",
-    updateAssignDescription
 );
 
 $("#search").addEventListener(
@@ -1001,34 +1006,18 @@ $("#assign").addEventListener(
             const selectedToolId =
                 $("#toolSelect").value;
 
-            const description =
-                $("#assignDescription")
+            const toolNumber =
+                $("#assignToolNumber")
                     .value
                     .trim();
 
-            if (!selectedToolId || !description) {
+            if (!selectedToolId || !toolNumber) {
                 showMessage(
-                    "Select a tool and enter its description.",
+                    "Select a tool and enter its tool number.",
                     "error"
                 );
                 return;
             }
-
-            await api(
-                `/rest/v1/tools?id=eq.${encodeURIComponent(
-                    selectedToolId
-                )}`,
-                {
-                    admin: true,
-                    method: "PATCH",
-                    headers: {
-                        Prefer: "return=minimal"
-                    },
-                    body: JSON.stringify({
-                        description
-                    })
-                }
-            );
 
             await api(
                 "/rest/v1/rpc/assign_tool",
@@ -1052,6 +1041,32 @@ $("#assign").addEventListener(
 
                         p_date:
                             $("#assignDate").value
+                    })
+                }
+            );
+
+            const newAllocations = await api(
+                "/rest/v1/tool_history" +
+                `?tool_id=eq.${encodeURIComponent(selectedToolId)}` +
+                `&technician=eq.${encodeURIComponent($("#technician").value.trim())}` +
+                `&site=eq.${encodeURIComponent($("#site").value.trim())}` +
+                `&assigned_on=eq.${encodeURIComponent($("#assignDate").value)}` +
+                "&ended_on=is.null" +
+                "&order=created_at.desc&limit=1"
+            );
+
+            if (!newAllocations?.[0]?.id) {
+                throw new Error("The allocation was created, but its tool number could not be saved.");
+            }
+
+            await api(
+                `/rest/v1/tool_history?id=eq.${encodeURIComponent(newAllocations[0].id)}`,
+                {
+                    admin: true,
+                    method: "PATCH",
+                    headers: { Prefer: "return=minimal" },
+                    body: JSON.stringify({
+                        tool_number: toolNumber
                     })
                 }
             );
@@ -1171,6 +1186,15 @@ $("#transferForm").addEventListener(
         event.preventDefault();
 
         try {
+            const sourceAllocation = history.find(record => {
+                return String(record.id) ===
+                    String($("#historyId").value);
+            });
+
+            if (!sourceAllocation) {
+                throw new Error("The original allocation could not be found.");
+            }
+
             await api(
                 "/rest/v1/rpc/transfer_tool",
                 {
@@ -1196,6 +1220,30 @@ $("#transferForm").addEventListener(
                     })
                 }
             );
+
+            const transferredAllocations = await api(
+                "/rest/v1/tool_history" +
+                `?tool_id=eq.${encodeURIComponent(sourceAllocation.tool_id)}` +
+                `&technician=eq.${encodeURIComponent($("#newTechnician").value.trim())}` +
+                `&site=eq.${encodeURIComponent($("#newSite").value.trim())}` +
+                `&assigned_on=eq.${encodeURIComponent($("#transferDate").value)}` +
+                "&ended_on=is.null" +
+                "&order=created_at.desc&limit=1"
+            );
+
+            if (transferredAllocations?.[0]?.id) {
+                await api(
+                    `/rest/v1/tool_history?id=eq.${encodeURIComponent(transferredAllocations[0].id)}`,
+                    {
+                        admin: true,
+                        method: "PATCH",
+                        headers: { Prefer: "return=minimal" },
+                        body: JSON.stringify({
+                            tool_number: sourceAllocation.tool_number || null
+                        })
+                    }
+                );
+            }
 
             $("#transfer").close();
 
