@@ -108,7 +108,7 @@
                     <input
                         id="search"
                         type="search"
-                        placeholder="Search tool, technician or site"
+                        placeholder="Search tool, number, technician or site"
                     >
                 </div>
 
@@ -130,6 +130,7 @@
                                 <th>Technician</th>
                                 <th>Site</th>
                                 <th>Tool</th>
+                                <th>Tool Number</th>
                                 <th>Assigned</th>
                                 <th>Ended</th>
                                 <th>Action</th>
@@ -289,14 +290,15 @@
                         </label>
 
                         <label>
-                            Tool description
+                            Tool number
 
-                            <textarea
-                                id="assignDescription"
-                                rows="3"
-                                placeholder="Add or update the selected tool description"
+                            <input
+                                id="assignToolNumber"
+                                type="text"
+                                placeholder="Example: FL-02/A"
+                                autocomplete="off"
                                 required
-                            ></textarea>
+                            >
                         </label>
 
                         <label>
