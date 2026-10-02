@@ -1,4 +1,122 @@
-"use strict";
+);
+
+/* =========================================================
+   CANCEL TRANSFER
+   ========================================================= */
+
+$("#cancel").addEventListener(
+    "click",
+    () => {
+        $("#transfer").close();
+    }
+);
+
+/* =========================================================
+   CONFIRM TRANSFER
+   ========================================================= */
+
+$("#transferForm").addEventListener(
+    "submit",
+    async event => {
+        event.preventDefault();
+
+        if (!validateAssignmentDate("#transferDate")) {
+            return;
+        }
+
+        try {
+            const sourceAllocation = history.find(record => {
+                return String(record.id) ===
+                    String($("#historyId").value);
+            });
+
+            if (!sourceAllocation) {
+                throw new Error("The original allocation could not be found.");
+            }
+
+            await api(
+                "/rest/v1/rpc/transfer_tool",
+                {
+                    admin: true,
+                    method: "POST",
+
+                    body: JSON.stringify({
+                        p_history_id:
+                            $("#historyId").value,
+
+                        p_technician:
+                            $("#newTechnician")
+                                .value
+                                .trim(),
+
+                        p_site:
+                            $("#newSite")
+                                .value
+                                .trim(),
+
+                        p_date:
+                            $("#transferDate").value
+                    })
+                }
+            );
+
+            const transferredAllocations = await api(
+                "/rest/v1/tool_history" +
+                `?tool_id=eq.${encodeURIComponent(sourceAllocation.tool_id)}` +
+                `&technician=eq.${encodeURIComponent($("#newTechnician").value.trim())}` +
+                `&site=eq.${encodeURIComponent($("#newSite").value.trim())}` +
+                `&assigned_on=eq.${encodeURIComponent($("#transferDate").value)}` +
+                "&ended_on=is.null" +
+                "&order=created_at.desc&limit=1"
+            );
+
+            if (transferredAllocations?.[0]?.id) {
+                await api(
+                    `/rest/v1/tool_history?id=eq.${encodeURIComponent(transferredAllocations[0].id)}`,
+                    {
+                        admin: true,
+                        method: "PATCH",
+                        headers: { Prefer: "return=minimal" },
+                        body: JSON.stringify({
+                            tool_number: sourceAllocation.tool_number || null
+                        })
+                    }
+                );
+            }
+
+            $("#transfer").close();
+
+            event.target.reset();
+
+            showMessage(
+                "Tool transferred."
+            );
+
+            await loadData();
+        } catch (error) {
+            showMessage(
+                error.message,
+                "error"
+            );
+        }
+    }
+);
+
+/* =========================================================
+   START APPLICATION
+   ========================================================= */
+
+showAuthentication();
+loadData();
+
+/*
+ * Refresh shared records every 60 seconds.
+ */
+
+setInterval(
+    loadData,
+    60000
+);"use strict";
 
 /* =========================================================
    SUPABASE CONFIGURATION
